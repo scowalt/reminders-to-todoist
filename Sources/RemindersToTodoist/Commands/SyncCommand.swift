@@ -4,6 +4,7 @@ import EventKit
 
 struct SyncCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
+        commandName: "sync",
         abstract: "Run sync operation (default command)"
     )
 

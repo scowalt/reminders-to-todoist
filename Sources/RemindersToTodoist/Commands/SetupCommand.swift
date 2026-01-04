@@ -4,6 +4,7 @@ import EventKit
 
 struct SetupCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
+        commandName: "setup",
         abstract: "Interactive setup wizard"
     )
 
