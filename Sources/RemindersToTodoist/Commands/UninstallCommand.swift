@@ -3,6 +3,7 @@ import ArgumentParser
 
 struct UninstallCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
+        commandName: "uninstall",
         abstract: "Uninstall LaunchAgent and cleanup"
     )
 
