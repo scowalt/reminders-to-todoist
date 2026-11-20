@@ -26,8 +26,10 @@ class KeychainService {
     /// Stores a token in the macOS Keychain
     /// Note: This method does NOT set trusted applications. Use the security command-line tool
     /// for that functionality (required for headless LaunchAgent operation).
-    func setToken(service: String, account: String, token: String) -> Bool {
-        guard let data = token.data(using: .utf8) else { return false }
+    func setToken(service: String, account: String, token: String) -> (success: Bool, error: String?) {
+        guard let data = token.data(using: .utf8) else {
+            return (false, "Failed to encode token as UTF-8")
+        }
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -51,7 +53,12 @@ class KeychainService {
                                   attributesToUpdate as CFDictionary)
         }
 
-        return status == errSecSuccess
+        if status == errSecSuccess {
+            return (true, nil)
+        } else {
+            let errorMsg = SecCopyErrorMessageString(status, nil) as String? ?? "Unknown error (code: \(status))"
+            return (false, errorMsg)
+        }
     }
 
     /// Deletes a token from the macOS Keychain

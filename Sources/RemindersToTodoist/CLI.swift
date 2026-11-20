@@ -1,5 +1,6 @@
 import ArgumentParser
 
+@main
 @available(macOS 10.15, macCatalyst 13, iOS 13, tvOS 13, watchOS 6, *)
 struct RemindersToTodoistTool: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
@@ -10,5 +11,3 @@ struct RemindersToTodoistTool: AsyncParsableCommand {
         defaultSubcommand: SyncCommand.self
     )
 }
-
-RemindersToTodoistTool.main()

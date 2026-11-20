@@ -2,6 +2,7 @@ import Foundation
 import ArgumentParser
 import EventKit
 
+@available(macOS 10.15, *)
 struct SyncCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "sync",
