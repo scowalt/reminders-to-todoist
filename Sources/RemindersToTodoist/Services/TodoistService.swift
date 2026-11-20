@@ -4,7 +4,7 @@ class TodoistService {
     let apiToken: String
     let baseURL: String
 
-    init(apiToken: String, baseURL: String = "https://api.todoist.com/rest/v2") {
+    init(apiToken: String, baseURL: String = "https://api.todoist.com/api/v1") {
         self.apiToken = apiToken
         self.baseURL = baseURL
     }

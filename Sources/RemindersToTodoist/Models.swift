@@ -5,19 +5,32 @@ import Foundation
 struct Config {
     let todoistToken: String
     let stateFilePath: String
-    let apiBaseURL: String = "https://api.todoist.com/rest/v2"
+    let apiBaseURL: String = "https://api.todoist.com/api/v1"
 
     static func load() throws -> Config {
-        let keychain = KeychainService()
-        guard let token = keychain.getToken(
-            service: "com.user.reminders-to-todoist",
-            account: "todoist-api-token"
-        ) else {
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        let configDir = homeDir.appendingPathComponent(".config/reminders-to-todoist")
+        let tokenFilePath = configDir.appendingPathComponent("token.txt")
+
+        // Try to load from config file first (for development/testing)
+        var token: String?
+        if FileManager.default.fileExists(atPath: tokenFilePath.path),
+           let fileToken = try? String(contentsOf: tokenFilePath, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
+           !fileToken.isEmpty {
+            token = fileToken
+        } else {
+            // Fall back to Keychain
+            let keychain = KeychainService()
+            token = keychain.getToken(
+                service: "com.user.reminders-to-todoist",
+                account: "todoist-api-token"
+            )
+        }
+
+        guard let token = token else {
             throw ConfigError.tokenNotFound
         }
 
-        let homeDir = FileManager.default.homeDirectoryForCurrentUser
-        let configDir = homeDir.appendingPathComponent(".config/reminders-to-todoist")
         let stateFilePath = configDir.appendingPathComponent("state.json").path
 
         return Config(todoistToken: token, stateFilePath: stateFilePath)
@@ -30,7 +43,7 @@ enum ConfigError: Error {
     var description: String {
         switch self {
         case .tokenNotFound:
-            return "Todoist API token not found in Keychain. Please run: reminders-to-todoist setup"
+            return "Todoist API token not found. Please run: reminders-to-todoist setup"
         }
     }
 }

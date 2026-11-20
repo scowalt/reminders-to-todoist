@@ -2,6 +2,7 @@ import Foundation
 import ArgumentParser
 import EventKit
 
+@available(macOS 10.15, *)
 struct SetupCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "setup",
@@ -30,21 +31,31 @@ struct SetupCommand: AsyncParsableCommand {
         print()
         print("🔍 Found binary at: \(binaryPath)")
 
-        // Step 3: Store token in Keychain with trusted app flags
-        print()
-        print("🔐 Step 2: Storing token in Keychain...")
-        do {
-            try storeTokenInKeychain(token: token, binaryPath: binaryPath)
-            print("✓ Token stored securely in macOS Keychain")
-        } catch {
-            print("❌ Failed to store token in Keychain: \(error.localizedDescription)")
-            throw ExitCode.failure
-        }
-
-        // Step 4: Create config directory
+        // Step 3: Create config directory
         let homeDir = FileManager.default.homeDirectoryForCurrentUser
         let configDir = homeDir.appendingPathComponent(".config/reminders-to-todoist")
         try? FileManager.default.createDirectory(at: configDir, withIntermediateDirectories: true)
+
+        // Step 4: Store token (try Keychain first, fall back to file)
+        print()
+        print("🔐 Step 2: Storing token...")
+        let keychain = KeychainService()
+        let result = keychain.setToken(service: "com.user.reminders-to-todoist", account: "todoist-api-token", token: token)
+        if result.success {
+            print("✓ Token stored securely in macOS Keychain")
+        } else {
+            print("⚠️  Keychain storage failed: \(result.error ?? "Unknown error")")
+            print("   Storing in config file instead (less secure)")
+            let tokenFile = configDir.appendingPathComponent("token.txt")
+            do {
+                try token.write(to: tokenFile, atomically: true, encoding: .utf8)
+                try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: tokenFile.path)
+                print("✓ Token stored in \(tokenFile.path)")
+            } catch {
+                print("❌ Failed to store token: \(error.localizedDescription)")
+                throw ExitCode.failure
+            }
+        }
 
         // Step 5: Install LaunchAgent
         print()
@@ -90,41 +101,28 @@ struct SetupCommand: AsyncParsableCommand {
 
     /// Finds the path to the current binary
     private func findBinaryPath() -> String {
-        // Try to use Process.executablePath first (most accurate)
+        // Get the executable path and resolve to absolute path
         if let executablePath = ProcessInfo.processInfo.arguments.first {
             let url = URL(fileURLWithPath: executablePath)
-            if url.pathComponents.contains("debug") || url.pathComponents.contains(".build") {
-                // Development build - assume it will be installed to /opt/homebrew/bin
-                return "/opt/homebrew/bin/reminders-to-todoist"
+
+            // Resolve to absolute path
+            let absolutePath: String
+            if url.path.hasPrefix("/") {
+                absolutePath = url.path
+            } else {
+                // Relative path - resolve it
+                let currentDir = FileManager.default.currentDirectoryPath
+                absolutePath = URL(fileURLWithPath: currentDir)
+                    .appendingPathComponent(url.path)
+                    .standardizedFileURL
+                    .path
             }
-            return url.path
+
+            return absolutePath
         }
 
         // Fallback to common install location
         return "/opt/homebrew/bin/reminders-to-todoist"
-    }
-
-    /// Stores the token in Keychain using the security command with trust flags
-    private func storeTokenInKeychain(token: String, binaryPath: String) throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
-        process.arguments = [
-            "add-generic-password",
-            "-s", "com.user.reminders-to-todoist",
-            "-a", "todoist-api-token",
-            "-w", token,
-            "-T", binaryPath,
-            "-T", "/usr/bin/security",
-            "-U"  // Update if exists
-        ]
-
-        try process.run()
-        process.waitUntilExit()
-
-        guard process.terminationStatus == 0 else {
-            throw NSError(domain: "SetupError", code: Int(process.terminationStatus),
-                         userInfo: [NSLocalizedDescriptionKey: "security command failed"])
-        }
     }
 
     /// Installs the LaunchAgent plist and loads it
